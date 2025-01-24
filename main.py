@@ -85,6 +85,20 @@ class WebScraper:
         options.add_argument("--disable-extensions")
         options.add_argument("--headless")
 
+        # SSL Certificate handling
+        options.set_capability('acceptInsecureCerts', True)
+
+        # Add proxy settings
+        options.add_argument('--proxy-server=direct://')
+        options.add_argument('--proxy-bypass-list=*')
+        options.add_argument('--no-proxy-server')
+
+        # Set environment variables for proxy
+        os.environ['no_proxy'] = '*'
+        os.environ['NO_PROXY'] = '*'
+        os.environ['HTTP_PROXY'] = ''
+        os.environ['HTTPS_PROXY'] = ''
+
         # Use ChromeDriverManager to handle driver installation
         service = Service(ChromeDriverManager().install())
 
@@ -110,9 +124,10 @@ class WebScraper:
 
             # Perform search
             search_input.clear()
+            time.sleep(3)
             search_input.send_keys(url)
             search_button.click()
-            time.sleep(3)
+            time.sleep(5)
 
             # Get all rows under CATEGORY and SUBCATEGORY sections
             categories = []
@@ -163,7 +178,8 @@ def process_urls(input_file: str, output_file: str) -> None:
 
         print(f"Processing {len(urls)} URLs...")
         for index, url in enumerate(urls, 1):
-            print(f"Processing URL {index}/{len(urls)}: {url}")
+            print("=" * 150)
+            print(f"Processing URL ::::::: {index}/{len(urls)} :::::::::::::::: {url}")
             result = web_scraper.search_and_extract(url)
             result['SNO'] = index
             results.append(result)
