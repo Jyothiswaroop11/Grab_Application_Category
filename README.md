@@ -5,6 +5,17 @@ A Python-based web scraping tool that automatically extracts category and subcat
 
 ## 📈 Version History
 
+### Version 3.0.0 (Current)
+- Added color-coded output formatting
+  - Green: Successfully found categories
+  - Red: No categories found
+  - Blue: No application found
+- Added yellow highlighting for headers
+- Enhanced alert handling for invalid applications
+- Renamed URL column to Application for clarity
+- Updated status messaging for better error reporting
+- Added cell color synchronization across rows
+
 ### Version 2.0.0 (Current)
 - Added proxy and SSL certificate handling
 - Implemented headless browser operation
