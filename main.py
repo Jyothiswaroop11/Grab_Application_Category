@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 import os
 import openpyxl
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, Font, PatternFill
 
 BASE_URL = "https://applipedia.paloaltonetworks.com/"
 CHROME_WAIT_TIME = 20  # Increased wait time
@@ -32,7 +32,7 @@ class ExcelHandler:
             df = pd.DataFrame(data)
             writer = pd.ExcelWriter(output_file, engine='openpyxl')
 
-            df[['SNO', 'URL', 'Category', 'Sub Category']].to_excel(
+            df[['SNO', 'Application', 'Category', 'Sub Category']].to_excel(
                 writer,
                 index=False,
                 sheet_name='Sheet1'
@@ -41,31 +41,42 @@ class ExcelHandler:
             workbook = writer.book
             worksheet = writer.sheets['Sheet1']
 
-            # # Auto-adjust columns width based on content
-            # for column in worksheet.columns:
-            #     max_length = 0
-            #     column = [cell for cell in column]
-            #     for cell in column:
-            #         try:
-            #             if len(str(cell.value)) > max_length:
-            #                 max_length = len(str(cell.value))
-            #         except:
-            #             pass
-            #     adjusted_width = (max_length + 2)
-            #     worksheet.column_dimensions[column[0].column_letter].width = adjusted_width
-
             # Set column widths
             col_widths = {'A': 5, 'B': 20, 'C': 35, 'D': 35}
             for col, width in col_widths.items():
                 worksheet.column_dimensions[col].width = width
 
-            # Apply text wrapping and top alignment
-            for row in worksheet.iter_rows(min_row=1, max_row=len(data) + 1):
-                for cell in row:
-                    cell.alignment = openpyxl.styles.Alignment(
-                        vertical='top',
-                        wrap_text=True
-                    )
+            # Add colors and formatting
+            header_fill = openpyxl.styles.PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid')
+
+            # Apply header formatting
+            for cell in worksheet[1]:
+                cell.fill = header_fill
+
+            # Apply text wrapping, alignment, and conditional colors
+            for row in worksheet.iter_rows(min_row=2, max_row=len(data) + 1):
+                category_status = row[2].value  # Category column
+                subcategory_status = row[3].value  # Sub Category column
+
+                for idx, cell in enumerate(row):
+                    cell.alignment = openpyxl.styles.Alignment(vertical='top', wrap_text=True)
+
+                    # Color logic for SNO and Application columns (idx 0 and 1)
+                    if idx in [0, 1]:
+                        if "No Application Found" in [category_status, subcategory_status]:
+                            cell.font = openpyxl.styles.Font(color="0000FF")  # Blue
+                        elif "No Category Found" in [category_status, subcategory_status]:
+                            cell.font = openpyxl.styles.Font(color="FF0000")  # Red
+                        else:
+                            cell.font = openpyxl.styles.Font(color="008000")  # Green
+
+                    # Original color logic for Category and Sub Category columns
+                    elif cell.value in ["No Category Found", "No Sub Category Found"]:
+                        cell.font = openpyxl.styles.Font(color="FF0000")
+                    elif cell.value in ["No Application Found"]:
+                        cell.font = openpyxl.styles.Font(color="0000FF")
+                    else:
+                        cell.font = openpyxl.styles.Font(color="008000")
 
             writer.close()
         except Exception as e:
@@ -108,13 +119,11 @@ class WebScraper:
 
     def search_and_extract(self, url: str) -> Dict:
         try:
-            # Load website
             self.driver.get(BASE_URL)
             WebDriverWait(self.driver, CHROME_WAIT_TIME).until(
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
 
-            # Find and interact with search elements
             search_input = WebDriverWait(self.driver, CHROME_WAIT_TIME).until(
                 EC.presence_of_element_located((By.ID, "tbSearch"))
             )
@@ -122,24 +131,34 @@ class WebScraper:
                 EC.element_to_be_clickable((By.ID, "btnSearch"))
             )
 
-            # Perform search
             search_input.clear()
             time.sleep(3)
             search_input.send_keys(url)
             search_button.click()
             time.sleep(5)
 
-            # Get all rows under CATEGORY and SUBCATEGORY sections
+            # Check for invalid value alert
+            try:
+                alert = self.driver.switch_to.alert
+                alert_text = alert.text
+                if "Invalid value" in alert_text:
+                    alert.accept()
+                    return {
+                        "Application": url,
+                        "Category": "No Application Found",
+                        "Sub Category": "No Application Found"
+                    }
+            except:
+                pass
+
             categories = []
             subcategories = []
 
-            # Find all category items
             category_elements = self.driver.find_elements(By.CSS_SELECTOR, "#CategoryList")
             for elem in category_elements:
                 if elem.text.strip():
                     categories.append(elem.text.strip())
 
-            # Find all subcategory items
             subcategory_elements = self.driver.find_elements(By.CSS_SELECTOR, "#SubCategoryList")
             for elem in subcategory_elements:
                 if elem.text.strip():
@@ -147,7 +166,7 @@ class WebScraper:
 
             if categories and subcategories:
                 return {
-                    "URL": url,
+                    "Application": url,
                     "Category": "\n".join(categories),
                     "Sub Category": "\n".join(subcategories)
                 }
@@ -157,9 +176,9 @@ class WebScraper:
         except Exception as e:
             print(f"Error processing URL {url}: {str(e)}")
             return {
-                "URL": url,
-                "Category": "No Categories Found",
-                "Sub Category": "No Sub Categories Found"
+                "Application": url,
+                "Category": "No Category Found",
+                "Sub Category": "No Sub Category Found"
             }
 
     def close(self):
